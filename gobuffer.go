@@ -30,7 +30,6 @@ type GoBuffer struct {
 	flushInterval time.Duration
 	flushBufPos   int
 	stopped       int
-	flushSucc     chan int
 }
 
 const _max_buf_cap int = 1024 * 1024 * 1024
@@ -49,9 +48,7 @@ func NewGoBuffer(bufCap int, output io.Writer, flushIntervalSecond int) (buf *Go
 		buf.Grow(bufCap)
 		ret.bufList = append(ret.bufList, buf)
 	}
-	ret.flushSucc = make(chan int, 1)
-	ret.flushSucc <- 1
-	return ret,nil
+	return ret, nil
 }
 
 func (m *GoBuffer) Write(p []byte) (n int, err error) {
@@ -139,11 +136,9 @@ func (m *GoBuffer) write(p []byte) (n int, err error) {
 }
 
 func (m *GoBuffer) swap() error {
-	go m.flush()
-	//if !m.flush() {
-	//	return fmt.Errorf("flush fail.")
-	//}
-	<- m.flushSucc
+	if !m.flush() {
+		return fmt.Errorf("flush fail.")
+	}
 	wIdx := m.writeIndex + 1
 	if wIdx >= len(m.bufList) {
 		wIdx = 0
@@ -153,9 +148,6 @@ func (m *GoBuffer) swap() error {
 }
 
 func (m *GoBuffer) flush() bool {
-	defer func() {
-		m.flushSucc <- 1
-	}()
 	remain := m.bufList[m.writeIndex].Len() - m.flushBufPos
 	for {
 		// fmt.Printf("flush remain %d\n", remain)
@@ -181,7 +173,7 @@ func (m *GoBuffer) flush() bool {
 	return remain == 0
 }
 
-func (m *GoBuffer) Flush() error{
+func (m *GoBuffer) Flush() error {
 	m.Lock()
 	defer m.Unlock()
 	return m.swap()
