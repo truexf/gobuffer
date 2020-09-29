@@ -12,6 +12,7 @@ import (
 
 func test1() {
 	fn := fmt.Sprintf("/tmp/gobuffer%d.buf", time.Now().Unix())
+	fmt.Println(fn)
 	fd, _ := os.OpenFile(fn, os.O_RDWR|os.O_CREATE, 0666)
 	buf := new(bytes.Buffer)
 	for i := 0; i < 10240; i++ {
@@ -22,7 +23,7 @@ func test1() {
 	md5, _ := goutil.BytesMd5(bts)
 	fmt.Println(len(bts))
 	fmt.Println("md5:", md5)
-	goBuf,_ := gobuffer.NewGoBuffer(256, fd, 1)
+	goBuf, _ := gobuffer.NewGoBuffer(256, fd, 1)
 	goBuf.Start()
 	pos := 0
 	for {
@@ -47,6 +48,9 @@ func test1() {
 	fmd5, _ := goutil.FileMd5(fn)
 	fmt.Printf("%s:%s\n", md5, fmd5)
 	fmt.Printf("size: %d\n", len(bts))
+	fbts, _ := ioutil.ReadFile(fn)
+	s, _ := goutil.BytesMd5(fbts)
+	fmt.Println(s)
 }
 
 func test2() {
@@ -63,7 +67,7 @@ func test2() {
 	md5, _ := goutil.BytesMd5(bts)
 	fmt.Println(len(bts))
 	fmt.Println(md5)
-	goBuf,_ := gobuffer.NewGoBuffer(256, fd, 1)
+	goBuf, _ := gobuffer.NewGoBuffer(256, fd, 1)
 	goBuf.Start()
 	count := 10
 	ch := make(chan int, count)
@@ -106,7 +110,7 @@ func test2() {
 }
 
 func main() {
-	 test1()
+	test1()
 	//go test2()
 
 	// for {

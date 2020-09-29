@@ -24,8 +24,9 @@ func (m *GoBufferErrorBufferPaused) Error() string {
 
 type GoBuffer struct {
 	sync.Mutex
-	bufList       []*bytes.Buffer
-	writeIndex    int
+	buf1          *bytes.Buffer
+	buf2          *bytes.Buffer
+	activeBuf     *bytes.Buffer
 	out           io.Writer
 	flushInterval time.Duration
 	stopped       int
@@ -44,12 +45,11 @@ func NewGoBuffer(bufCap int, output io.Writer, flushIntervalSecond int) (buf *Go
 	ret.flushInterval = time.Second * time.Duration(flushIntervalSecond)
 	ret.freeBufChan = make(chan int, 1)
 	ret.freeBufChan <- 1
-	ret.bufList = make([]*bytes.Buffer, 0, 2)
-	for i := 0; i < 2; i++ {
-		buf := new(bytes.Buffer)
-		buf.Grow(bufCap)
-		ret.bufList = append(ret.bufList, buf)
-	}
+	ret.buf1 = new(bytes.Buffer)
+	ret.buf1.Grow(bufCap)
+	ret.buf2 = new(bytes.Buffer)
+	ret.buf2.Grow(bufCap)
+	ret.activeBuf = ret.buf1
 	return ret, nil
 }
 
@@ -60,7 +60,7 @@ func (m *GoBuffer) Write(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	if len(p) > m.bufList[0].Cap() {
+	if len(p) > m.activeBuf.Cap() {
 		return 0, new(GoBufferErrorBlockTooBig)
 	}
 
@@ -71,7 +71,7 @@ func (m *GoBuffer) Write(p []byte) (n int, err error) {
 
 func (m *GoBuffer) write(p []byte) (n int, err error) {
 	retn := 0
-	remain := m.bufList[m.writeIndex].Cap() - m.bufList[m.writeIndex].Len()
+	remain := m.activeBuf.Cap() - m.activeBuf.Len()
 	doSwap := false
 	if remain == 0 {
 		doSwap = true
@@ -80,7 +80,7 @@ func (m *GoBuffer) write(p []byte) (n int, err error) {
 		pos := 0
 		doSwap = true
 		for {
-			nn, e := m.bufList[m.writeIndex].Write(ptmp[pos:])
+			nn, e := m.activeBuf.Write(ptmp[pos:])
 			retn += nn
 			pos += nn
 			remain -= nn
@@ -96,7 +96,7 @@ func (m *GoBuffer) write(p []byte) (n int, err error) {
 		pos := 0
 		remain := len(p)
 		for {
-			nn, e := m.bufList[m.writeIndex].Write(ptmp[pos:])
+			nn, e := m.activeBuf.Write(ptmp[pos:])
 			retn += nn
 			pos += nn
 			remain -= nn
@@ -122,7 +122,7 @@ func (m *GoBuffer) write(p []byte) (n int, err error) {
 	pos := retn
 
 	for {
-		nn, e := m.bufList[m.writeIndex].Write(ptmp[pos:])
+		nn, e := m.activeBuf.Write(ptmp[pos:])
 		retn += nn
 		pos += nn
 		dataRemain -= nn
@@ -138,30 +138,29 @@ func (m *GoBuffer) write(p []byte) (n int, err error) {
 }
 
 func (m *GoBuffer) swap() error {
-	go m.flush()
-	<- m.freeBufChan
-	wIdx := m.writeIndex + 1
-	if wIdx >= len(m.bufList) {
-		wIdx = 0
+	<-m.freeBufChan
+	go m.flush(m.activeBuf)
+	if m.activeBuf == m.buf1 {
+		m.activeBuf = m.buf2
+	} else {
+		m.activeBuf = m.buf1
 	}
-	m.writeIndex = wIdx
-	m.bufList[m.writeIndex].Reset()
+	m.activeBuf.Reset()
 	return nil
 }
 
-func (m *GoBuffer) flush() bool {
+func (m *GoBuffer) flush(buf *bytes.Buffer) bool {
 	defer func() {
 		m.freeBufChan <- 1
 	}()
-
 	flushBufPos := 0
-	remain := m.bufList[m.writeIndex].Len()
+	remain := buf.Len()
 	for {
-		n, e := m.out.Write(m.bufList[m.writeIndex].Bytes()[flushBufPos:])
+		n, e := m.out.Write(buf.Bytes()[flushBufPos:])
 		remain -= n
 		flushBufPos += n
 		if remain <= 0 {
-			m.bufList[m.writeIndex].Reset()
+			buf.Reset()
 			return true
 		}
 		if n == 0 || e != nil {
