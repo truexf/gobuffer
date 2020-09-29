@@ -28,8 +28,8 @@ type GoBuffer struct {
 	writeIndex    int
 	out           io.Writer
 	flushInterval time.Duration
-	flushBufPos   int
 	stopped       int
+	freeBufChan   chan int
 }
 
 const _max_buf_cap int = 1024 * 1024 * 1024
@@ -42,6 +42,8 @@ func NewGoBuffer(bufCap int, output io.Writer, flushIntervalSecond int) (buf *Go
 	ret.out = output
 	ret.stopped = 1
 	ret.flushInterval = time.Second * time.Duration(flushIntervalSecond)
+	ret.freeBufChan = make(chan int, 1)
+	ret.freeBufChan <- 1
 	ret.bufList = make([]*bytes.Buffer, 0, 2)
 	for i := 0; i < 2; i++ {
 		buf := new(bytes.Buffer)
@@ -136,34 +138,30 @@ func (m *GoBuffer) write(p []byte) (n int, err error) {
 }
 
 func (m *GoBuffer) swap() error {
-	if !m.flush() {
-		return fmt.Errorf("flush fail.")
-	}
+	go m.flush()
+	<- m.freeBufChan
 	wIdx := m.writeIndex + 1
 	if wIdx >= len(m.bufList) {
 		wIdx = 0
 	}
 	m.writeIndex = wIdx
+	m.bufList[m.writeIndex].Reset()
 	return nil
 }
 
 func (m *GoBuffer) flush() bool {
-	remain := m.bufList[m.writeIndex].Len() - m.flushBufPos
-	for {
-		// fmt.Printf("flush remain %d\n", remain)
-		n, e := m.out.Write(m.bufList[m.writeIndex].Bytes()[m.flushBufPos:])
-		// fmt.Printf("flush n %d\n", n)
-		remain -= n
-		m.flushBufPos += n
-		if remain <= 0 {
-			// fmt.Println("flush ok")
-			m.bufList[m.writeIndex].Reset()
-			m.writeIndex++
-			if m.writeIndex >= len(m.bufList) {
-				m.writeIndex = 0
-			}
-			m.flushBufPos = 0
+	defer func() {
+		m.freeBufChan <- 1
+	}()
 
+	flushBufPos := 0
+	remain := m.bufList[m.writeIndex].Len()
+	for {
+		n, e := m.out.Write(m.bufList[m.writeIndex].Bytes()[flushBufPos:])
+		remain -= n
+		flushBufPos += n
+		if remain <= 0 {
+			m.bufList[m.writeIndex].Reset()
 			return true
 		}
 		if n == 0 || e != nil {

@@ -22,7 +22,7 @@ func test1() {
 	md5, _ := goutil.BytesMd5(bts)
 	fmt.Println(len(bts))
 	fmt.Println("md5:", md5)
-	goBuf := gobuffer.NewGoBuffer(256, fd, 1)
+	goBuf,_ := gobuffer.NewGoBuffer(256, fd, 1)
 	goBuf.Start()
 	pos := 0
 	for {
@@ -63,7 +63,7 @@ func test2() {
 	md5, _ := goutil.BytesMd5(bts)
 	fmt.Println(len(bts))
 	fmt.Println(md5)
-	goBuf := gobuffer.NewGoBuffer(256, fd, 1)
+	goBuf,_ := gobuffer.NewGoBuffer(256, fd, 1)
 	goBuf.Start()
 	count := 10
 	ch := make(chan int, count)
