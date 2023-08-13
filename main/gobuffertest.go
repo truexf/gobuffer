@@ -3,12 +3,28 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/truexf/gobuffer"
-	"github.com/truexf/goutil"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"github.com/truexf/gobuffer"
+	"github.com/truexf/goutil"
 )
+
+func testLinedContent() {
+	fb, err := gobuffer.NewTimedFileWriterWithGoBuffer2(200, 3, "/tmp", "gb", "20060102150405")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	for i := 0; i < 300; i++ {
+		fb.Write([]byte("123456789abcdefghijklmnopqrstuvwxyz\n"))
+		time.Sleep(time.Millisecond * 30)
+	}
+	fb.Flush()
+	fb.Flush()
+	// time.Sleep(time.Second * 3)
+}
 
 func test1() {
 	fn := fmt.Sprintf("/tmp/gobuffer%d.buf", time.Now().Unix())
@@ -110,6 +126,8 @@ func test2() {
 }
 
 func main() {
+	testLinedContent()
+	return
 	test1()
 	//go test2()
 
