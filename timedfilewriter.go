@@ -76,6 +76,16 @@ func NewTimedFileWriterWithGoBuffer(bufCap int, flushIntervalSecond int, saveDir
 	return ret, err
 }
 
+func NewLinedTimedFileWriterWithGoBuffer(bufCap int, flushIntervalSecond int, saveDir, fileNameFormat string) (buf *GoBuffer, e error) {
+	fileWriter := &TimedFileWriter{dir: saveDir, fnFormat: fileNameFormat}
+	fileWriter.SetContentLined(true)
+	ret, err := NewGoBuffer(bufCap, fileWriter, flushIntervalSecond)
+	if err == nil {
+		ret.Start()
+	}
+	return ret, err
+}
+
 func NewTimedFileWriterWithGoBuffer2(bufCap int, flushIntervalSecond int, saveDir, filePrefix, datetimeFormat string) (buf *GoBuffer, e error) {
 	fileWriter := &TimedFileWriter{dir: saveDir, filePrefix: filePrefix, datetimeFormat: datetimeFormat}
 	fileWriter.SetContentLined(false)
@@ -86,7 +96,7 @@ func NewTimedFileWriterWithGoBuffer2(bufCap int, flushIntervalSecond int, saveDi
 	return ret, err
 }
 
-func NewLinedTimedFileWriterWithGoBuffer(bufCap int, flushIntervalSecond int, saveDir, filePrefix, datetimeFormat string) (buf *GoBuffer, e error) {
+func NewLinedTimedFileWriterWithGoBuffer2(bufCap int, flushIntervalSecond int, saveDir, filePrefix, datetimeFormat string) (buf *GoBuffer, e error) {
 	fileWriter := &TimedFileWriter{dir: saveDir, filePrefix: filePrefix, datetimeFormat: datetimeFormat}
 	fileWriter.SetContentLined(true)
 	ret, err := NewGoBuffer(bufCap, fileWriter, flushIntervalSecond)
